@@ -87,8 +87,8 @@ class IsaacLabEngine(engine.Engine):
         else:
             self._control_mode = engine.ControlMode.none
 
-        self._build_ground()
         self._env_offsets = self._compute_env_offsets(num_envs)
+        self._build_ground()
         
         if (visualize or record_video):
             self._build_lights()
@@ -599,9 +599,13 @@ class IsaacLabEngine(engine.Engine):
         ground_col *= 0.017
         ground_path = GROUND_PATH
 
+        env_offset_max = torch.max(torch.abs(self._env_offsets)).item()
+        texture_width = max(100.0, 3.0 * env_offset_max)
+
         physics_material = sim_utils.RigidBodyMaterialCfg(static_friction=1.0, dynamic_friction=1.0,
                                                           restitution=0.0)
-        plane_cfg = GroundPlaneCfg(physics_material=physics_material, color=ground_col)
+        plane_cfg = GroundPlaneCfg(physics_material=physics_material, color=ground_col,
+                                    size=(texture_width, texture_width))
         self._ground = spawn_ground_plane(prim_path=ground_path, cfg=plane_cfg)
 
         # add rigid body schema to terrain to enable contact sensors
