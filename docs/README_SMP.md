@@ -79,10 +79,14 @@ GSI is disabled for the single-clip experiments. Therefore, the motion data used
 ## Citation
 
 ```bibtex
-@article{mu2025smp,
-  title={SMP: Reusable Score-Matching Motion Priors for Physics-Based Character Control},
-  author={Mu, Yuxuan and Zhang, Ziyu and Shi, Yi and Yang, Dun and Matsumoto, Minami and Imamura, Kotaro and Tevet, Guy and Guo, Chuan and Taylor, Michael and Shu, Chang and Xi, Pengcheng and Peng, Xue Bin},
-  journal={arXiv preprint arXiv:2512.03028},
-  year={2025}
+@article{
+	mu2026smp,
+	title = {SMP: Reusable Score-Matching Motion Priors for Physics-Based Character Control},
+	author = {Mu, Yuxuan and Zhang, Ziyu and Shi, Yi and Yang, Dun and
+             Matsumoto, Minami and Imamura, Kotaro and Tevet, Guy and
+             Guo, Chuan and Taylor, Michael and Shu, Chang and
+             Xi, Pengcheng and Peng, Xue Bin},
+	journal = {ACM Transactions on Graphics (Proceedings of SIGGRAPH 2026)},
+	year = {2026}
 }
 ```
