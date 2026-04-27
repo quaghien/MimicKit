@@ -294,5 +294,5 @@ def compute_steering_reward(root_pos, prev_root_pos, root_rot, tar_dir, tar_spee
     face_reward = torch.clamp_min(face_err, 0.0)
 
     reward = tar_reward_w * tar_reward + face_reward_w * face_reward
-
+    
     return reward

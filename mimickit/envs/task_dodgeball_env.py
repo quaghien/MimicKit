@@ -251,9 +251,10 @@ class TaskDodgeballEnv(smp_env.SMPEnv):
     def _update_reward(self):
         char_id = self._get_char_id()
         root_pos = self._engine.get_root_pos(char_id)
+        root_vel = self._engine.get_root_vel(char_id)
         proj_pos, _ = self._get_proj_states()
 
-        self._reward_buf[:] = compute_dodge_reward(root_pos=root_pos, proj_pos=proj_pos)
+        self._reward_buf[:] = compute_dodge_reward(root_pos=root_pos, root_vel=root_vel, proj_pos=proj_pos)
         return
 
     def _update_done(self):
@@ -325,10 +326,21 @@ def compute_dodgeball_fail_flags(body_pos, proj_pos, proj_vel, prev_proj_vel, pr
     return hit_fail
 
 @torch.jit.script
-def compute_dodge_reward(root_pos, proj_pos):
-    # type: (Tensor, Tensor) -> Tensor
-    scale = 0.3
+def compute_dodge_reward(root_pos, root_vel, proj_pos):
+    # type: (Tensor, Tensor, Tensor) -> Tensor
+    pos_w = 0.9
+    vel_w = 0.1
+
+    pos_scale = 0.3
+    vel_scale = 1.0
+
     pos_diff = proj_pos - root_pos.unsqueeze(-2)
     pos_err = torch.min(torch.linalg.norm(pos_diff, dim=-1), dim=-1).values
-    pos_reward = 1.0 - torch.exp(-scale * pos_err)
-    return pos_reward
+    pos_reward = 1.0 - torch.exp(-pos_scale * pos_err)
+
+    vel_err = torch.sum(torch.square(root_vel[..., :2]), dim=-1)
+    vel_reward = torch.exp(-vel_scale * vel_err)
+
+    reward = pos_w * pos_reward + vel_w * vel_reward
+
+    return reward
