@@ -240,6 +240,10 @@ class IsaacLabEngine(engine.Engine):
     def get_num_envs(self):
         return self._env_offsets.shape[0]
     
+    def get_gravity(self):
+        gravity = np.array(self._sim.cfg.gravity)
+        return gravity
+    
     def get_objs_per_env(self):
         return len(self._obj_cfgs[0])
     
@@ -886,7 +890,8 @@ class IsaacLabEngine(engine.Engine):
         usd_asset_file = self._parse_usd_path(obj_cfg.asset_file)
         usd_cfg = sim_utils.UsdFileCfg(usd_path=usd_asset_file, 
                                        visual_material=visual_material, 
-                                       rigid_props=rigid_props)
+                                       rigid_props=rigid_props,
+                                       activate_contact_sensors=True)
         
         prim_path = OBJ_PATH_TEMPLATE.format(env_id, obj_id)
         init_state = RigidObjectCfg.InitialStateCfg(pos=obj_cfg.start_pos, rot=obj_cfg.start_rot)
