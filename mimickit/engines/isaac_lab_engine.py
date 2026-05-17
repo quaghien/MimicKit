@@ -708,6 +708,7 @@ class IsaacLabEngine(engine.Engine):
             "headless": not visualize,
             "device": self._device,
             "enable_cameras": record_video or visualize,
+            "kit_args": "--/rtx/verifyDriverVersion=false --/rtx/post/dlss/execMode=0 --/rtx/post/aa/op=0 --/rtx/shadows/enabled=false --/rtx/post/histogram/enabled=false --/renderer/resolution/width=1280 --/renderer/resolution/height=720 --/rtx/resourcemanager/maxTextureMemoryMB=256 --/rtx/materialDb/enabled=false --/rtx/sceneDb/maxInstances=65536",
         })
         
         import isaaclab.sim as sim_utils
@@ -719,7 +720,13 @@ class IsaacLabEngine(engine.Engine):
         sim_cfg.physx.bounce_threshold_velocity = 0.2
         sim_cfg.physx.max_position_iteration_count = 4
         sim_cfg.physx.max_velocity_iteration_count = 0
-        sim_cfg.physx.gpu_max_rigid_contact_count = 8 * 1024 * 1024
+        if visualize:
+            # RTX renderer takes ~2GB; shrink PhysX buffers to fit remaining VRAM
+            sim_cfg.physx.gpu_max_rigid_contact_count = 64 * 1024
+            sim_cfg.physx.gpu_max_rigid_patch_count = 32 * 1024
+            sim_cfg.physx.gpu_heap_capacity = 64 * 1024 * 1024
+            sim_cfg.physx.gpu_temp_buffer_capacity = 16 * 1024 * 1024
+            sim_cfg.physx.gpu_max_num_partitions = 4
         sim_cfg.physics_material.static_friction = 1.0
         sim_cfg.physics_material.dynamic_friction = 1.0
         

@@ -142,6 +142,47 @@ A script to convert SMPL motion files from [AMASS](https://amass.is.tue.mpg.de/)
 
 ---
 
+## Laptop / Low VRAM Setup (RTX 3050 Ti / 4GB)
+
+> Xem hướng dẫn đầy đủ tại [docs/README_GPU_LAPTOP_SETUP.md](docs/README_GPU_LAPTOP_SETUP.md).
+
+Nếu chạy trên laptop hybrid graphics với VRAM thấp (4GB), cần một số bước bổ sung.
+
+**Yêu cầu driver:** Isaac Sim 5.1 chỉ hoạt động ổn với driver NVIDIA **535.x** trên Linux. Bật chế độ NVIDIA thuần (không dùng on-demand):
+```bash
+sudo prime-select nvidia && sudo reboot
+```
+
+### Test với visualization (1 env, 4GB VRAM)
+
+```bash
+python mimickit/run.py \
+  --arg_file args/deepmimic_humanoid_ppo_args.txt \
+  --engine_config data/engines/isaac_lab_engine.yaml \
+  --num_envs 1 \
+  --visualize true \
+  --mode test \
+  --model_file data/models/deepmimic_humanoid_spinkick_model.pt
+```
+
+### Train headless với VRAM thấp
+
+Default `--num_envs 4096` yêu cầu 16GB+ VRAM. Với GPU 4GB, dùng headless và giảm số envs:
+
+```bash
+# 2048/1024 envs - nếu bị CUDA OOM thì 512
+python mimickit/run.py \
+  --arg_file args/deepmimic_humanoid_ppo_args.txt \
+  --engine_config data/engines/isaac_lab_engine.yaml \
+  --num_envs 512 \
+  --visualize false \
+  --mode train \
+  --out_dir output/ \
+  --logger wandb
+```
+
+---
+
 ## Citation
 If you find this codebase helpful, please cite:
 ```
