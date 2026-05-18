@@ -197,15 +197,23 @@ File: [`data/envs/deepmimic_humanoid_env.yaml`](/home/wanhin/hienhq/MimicKit/dat
 - `global_obs = True`: observation ở hệ global
 - `root_height_obs = True`: giữ thông tin chiều cao root
 - `enable_phase_obs = False`: không thêm phase obs
-- `enable_tar_obs = True`: có thêm future target observation
+- `enable_tar_obs`: mặc định trong code `DeepMimicEnv` là `False`; riêng file `data/envs/deepmimic_humanoid_env.yaml` hiện tại truyền vào `True`, nên env này đang bật future target observation
 - `num_phase_encoding = 4`: số chiều encoding phase nếu bật phase obs
-- `tar_obs_steps = [1, 2, 3]`: lấy target tại 3 step tương lai
+- `tar_obs_steps = [1, 2, 3]`: lấy target tại 3 step tương lai; với config hiện tại do `enable_tar_obs=True` nên phần này thực sự đi vào input của actor
+- Khi train: future target được lấy từ motion reference theo `motion_id` và `motion_time` hiện tại của sample, rồi cộng thêm `dt * [1, 2, 3]`
+- Khi inference: vẫn lấy theo đúng motion reference đang chạy ở env hiện tại; actor không tự dự đoán target, mà đọc target future do env build sẵn trong observation
 
 ### Nhóm reset/reference
 
 - `rand_reset = True`: reset ngẫu nhiên tại các thời điểm khác nhau trong motion
 - `ref_char_offset = [2.0, 0.0, 0.0]`: ref character đứng lệch sang bên 2m
-- `init_pose = [...]`: tư thế khởi tạo mặc định
+- `init_pose = [0, 0, 0.882416, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1.5708, 0, 0, 0, -1.5708, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]`
+- Giải thích ngắn:
+  `0, 0, 0.882416` là `root_pos` ban đầu, tức nhân vật đứng tại gốc XY và cao khoảng `0.882m`
+  `0, 0, 0` tiếp theo là `root_rot` ở dạng exponential map, nghĩa là chưa xoay thân gốc
+  các số còn lại là `dof` khớp; đa số bằng `0` nên ở tư thế neutral
+  `1.5708` xấp xỉ `pi/2`, thường là một khớp tay giơ sang ngang 90 độ
+  `-1.5708` xấp xỉ `-pi/2`, là khớp đối xứng bên còn lại
 
 ### Nhóm termination/contact
 
@@ -216,7 +224,15 @@ File: [`data/envs/deepmimic_humanoid_env.yaml`](/home/wanhin/hienhq/MimicKit/dat
 ### Nhóm reward
 
 - `key_bodies = ["head", "right_hand", "left_hand", "right_foot", "left_foot"]`
-- `joint_err_w = [...]`
+- `key_bodies` là key trong `env_config`; mặc định trong code là `[]`, còn env hiện tại truyền vào 5 body quan trọng ở trên
+- Trong `CharEnv`, nó được parse thành `self._key_body_ids` để cắt ra vị trí của các body này từ `body_pos`
+- Ý nghĩa: đây là các mốc cơ thể quan trọng để so sánh với motion reference trong reward và, nếu bật future target, cũng đi vào phần target observation
+- Ví dụ ngắn: theo dõi `head` và `foot` giúp policy bám tốt hơn các động tác như cúi người, bước chân, đá chân; nếu bỏ hết `key_bodies` thì reward sẽ bớt nhạy với vị trí các điểm quan trọng này
+- `joint_err_w = [1.0, 0.6, 0.6, 0.4, 0.0, 0.6, 0.4, 0.0, 1.0, 0.6, 0.4, 1.0, 0.6, 0.4]`
+- `joint_err_w` là key trong `env_config`; trong code nếu không truyền thì mặc định mọi joint đều có weight `1.0`, còn env hiện tại truyền vào list ở trên
+- Trong `DeepMimicEnv`, nó được parse thành `self._joint_err_w`, rồi map tiếp xuống `self._dof_err_w` để tính lỗi pose/velocity theo từng joint/DOF
+- Ý nghĩa: joint nào weight lớn thì sai số ở joint đó bị phạt mạnh hơn; weight nhỏ thì phạt nhẹ hơn; weight `0.0` thì gần như bỏ qua joint đó trong phần error tương ứng
+- Ví dụ ngắn: nếu vai có weight `1.0` còn cổ tay có weight `0.4`, thì lệch cùng một mức ở vai sẽ bị phạt nặng hơn khoảng `2.5` lần so với cổ tay
 - `reward_pose_w = 0.5`
 - `reward_vel_w = 0.1`
 - `reward_root_pose_w = 0.15`
@@ -593,17 +609,39 @@ Nó gọi:
 
 Trong `_build_character(...)`:
 
-- lấy `char_file` dòng `83`
-- gọi `self._engine.create_obj(...)` dòng `84-90`
-- `obj_type = articulated`
-- `asset_file = humanoid.xml`
-- `name = "character"`
-- `start_pos = self._init_root_pos`
-- `start_rot = self._init_root_rot`
+- lấy `char_file` từ `env_config` ở dòng `83`
+- gọi `self._engine.create_obj(...)` ở dòng `84-90`
+- truyền các tham số chính:
+  - `env_id`
+  - `obj_type = articulated`
+  - `asset_file = char_file`
+  - `name = "character"`
+  - `start_pos = self._init_root_pos`
+  - `start_rot = self._init_root_rot`
+  - `color = char_col`
 
 Ý nghĩa:
 
 - mỗi env được gắn một humanoid articulated object
+- dễ hiểu hơn: đây là bước “khai báo trong env này sẽ có một nhân vật humanoid, dùng asset nào, đứng ở đâu, xoay hướng nào”
+
+Giải thích nhanh từng key/tham số:
+
+- `env_config`: dictionary config của env, lấy từ YAML; nó chứa các key như `char_file`, `init_pose`, `key_bodies`, `motion_file`
+- `char_file`: đường dẫn tới file mô tả nhân vật, ở đây là `data/assets/humanoid/humanoid.xml`
+- `obj_type = articulated`: object này là vật thể có nhiều khớp nối, không phải box/sphere cứng đơn giản
+- `asset_file`: file asset thật để engine biết phải load humanoid nào
+- `name = "character"`: tên object trong env; đây là nhân vật chính mà policy điều khiển
+- `start_pos`: vị trí root ban đầu của humanoid trong world, lấy từ `init_pose`
+- `start_rot`: hướng/quaternion ban đầu của root, cũng lấy từ `init_pose`
+- `color`: màu để visualize; không ảnh hưởng reward hay policy
+
+Hiểu theo flow:
+
+1. `char_file` chọn “thân xác” humanoid
+2. `init_pose` đã được parse từ trước thành `self._init_root_pos`, `self._init_root_rot`, `self._init_dof_pos`
+3. `_build_character(...)` dùng các giá trị đó để nói với engine: hãy tạo một humanoid chính cho env này
+4. engine lưu cấu hình object; đến bước initialize simulator mới spawn vật thể thật
 
 ### 15.2. Ở `DeepMimicEnv`
 
@@ -627,6 +665,19 @@ Sau đó:
 
 - đây là character tham chiếu để xem motion target
 - nó không phải nhân vật policy điều khiển
+
+Giải thích nhanh các key/tham số này là gì:
+
+- `ref_character`: humanoid phụ chỉ để hiển thị motion reference
+- `is_visual = True`: object này chỉ phục vụ hiển thị, không phải actor chính để điều khiển task
+- `disable_motors = True`: tắt motor/actuator vì ref character không cần nhận action
+- `enable_self_collisions = False`: tắt tự va chạm để nó nhẹ hơn và tránh ảnh hưởng không cần thiết
+- `ref_char_offset`: vị trí lệch thêm so với nhân vật chính để khi visualize có thể nhìn cả hai cùng lúc
+
+Hiểu ngắn gọn:
+
+- `character`: humanoid thật mà actor điều khiển
+- `ref_character`: humanoid mẫu để cho ta nhìn motion target
 
 ---
 
